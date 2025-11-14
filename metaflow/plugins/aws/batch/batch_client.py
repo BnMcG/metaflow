@@ -162,6 +162,7 @@ class BatchJob(object):
         ephemeral_storage,
         log_driver,
         log_options,
+        cpu_architecture,
     ):
         # identify platform from any compute environment associated with the
         # queue
@@ -232,6 +233,11 @@ class BatchJob(object):
             job_definition["platformCapabilities"] = ["FARGATE"]
             job_definition["containerProperties"]["networkConfiguration"] = {
                 "assignPublicIp": "ENABLED"
+            }
+            # Set runtime platform for CPU architecture
+            job_definition["containerProperties"]["runtimePlatform"] = {
+                "operatingSystemFamily": "LINUX",
+                "cpuArchitecture": cpu_architecture or "X86_64",
             }
             if ephemeral_storage:
                 job_definition["containerProperties"]["ephemeralStorage"] = {
@@ -480,6 +486,7 @@ class BatchJob(object):
         ephemeral_storage,
         log_driver,
         log_options,
+        cpu_architecture,
     ):
         self.payload["jobDefinition"] = self._register_job_definition(
             image,
@@ -502,6 +509,7 @@ class BatchJob(object):
             ephemeral_storage,
             log_driver,
             log_options,
+            cpu_architecture,
         )
         return self
 

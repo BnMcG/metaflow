@@ -99,6 +99,9 @@ class BatchDecorator(StepDecorator):
         List of strings containing options for the chosen log driver. The configurable values
         depend on the `log driver` chosen. Validation of these options is not supported yet.
         Example: [`awslogs-group:aws/batch/job`]
+    cpu_architecture : str, default "X86_64"
+        The CPU architecture for the container. Supported values are "X86_64" and "ARM64".
+        This is primarily used for Fargate compute environments.
     """
 
     name = "batch"
@@ -127,6 +130,7 @@ class BatchDecorator(StepDecorator):
         "log_driver": None,
         "log_options": None,
         "executable": None,
+        "cpu_architecture": "X86_64",
     }
     resource_defaults = {
         "cpu": "1",
@@ -207,6 +211,15 @@ class BatchDecorator(StepDecorator):
         # clean up the alias attribute so it is not passed on.
         self.attributes.pop("trainium", None)
 
+        # Validate cpu_architecture
+        valid_architectures = ["X86_64", "ARM64"]
+        if self.attributes["cpu_architecture"] not in valid_architectures:
+            raise BatchException(
+                "Invalid cpu_architecture '{}'. Must be one of: {}".format(
+                    self.attributes["cpu_architecture"], ", ".join(valid_architectures)
+                )
+            )
+
     # Refer https://github.com/Netflix/metaflow/blob/master/docs/lifecycle.png
     # to understand where these functions are invoked in the lifecycle of a
     # Metaflow flow.
@@ -270,6 +283,9 @@ class BatchDecorator(StepDecorator):
             cli_args.command_options.update(
                 {k: v for k, v in self.attributes.items() if k not in _skip_keys}
             )
+            cli_args.command_options["cpu-architecture"] = self.attributes[
+                "cpu_architecture"
+            ]
             cli_args.command_options["run-time-limit"] = self.run_time_limit
 
             # Pass the supplied AWS batch tags to the step CLI cmd

@@ -899,6 +899,7 @@ class StepFunctions(object):
                 log_driver=resources["log_driver"],
                 log_options=resources["log_options"],
                 offload_command_to_s3=self.compress_state_machine,
+                cpu_architecture=resources["cpu_architecture"],
             )
             .attempts(total_retries + 1)
         )

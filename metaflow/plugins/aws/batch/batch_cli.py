@@ -190,6 +190,12 @@ def kill(ctx, run_id, user, my_runs):
     type=int,
     help="Number of parallel nodes to run as a multi-node job.",
 )
+@click.option(
+    "--cpu-architecture",
+    default="X86_64",
+    type=str,
+    help="CPU architecture for the container (X86_64 or ARM64). Primarily for Fargate.",
+)
 @click.pass_context
 def step(
     ctx,
@@ -222,6 +228,7 @@ def step(
     log_driver=None,
     log_options=None,
     num_parallel=None,
+    cpu_architecture=None,
     **kwargs
 ):
     def echo(msg, stream="stderr", batch_id=None, **kwargs):
@@ -366,6 +373,7 @@ def step(
                 log_driver=log_driver,
                 log_options=log_options,
                 num_parallel=num_parallel,
+                cpu_architecture=cpu_architecture,
             )
     except Exception:
         traceback.print_exc()
