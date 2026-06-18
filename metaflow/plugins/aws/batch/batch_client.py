@@ -69,11 +69,22 @@ def describe_jobs(batch_client, jobs):
     return data
 
 
+@batch_retry
+def _describe_job_queues(batch_client, **kwargs):
+    return batch_client.describe_job_queues(**kwargs)
+
+
+@batch_retry
+def _describe_compute_environments(batch_client, **kwargs):
+    return batch_client.describe_compute_environments(**kwargs)
+
+
 class BatchClient(object):
     def __init__(self):
         from ..aws_client import get_aws_client
 
         self._client = get_aws_client("batch")
+        self._platform_cache = {}  # job_queue -> platform type
 
     def active_job_queues(self):
         paginator = self._client.get_paginator("describe_job_queues")
@@ -226,16 +237,21 @@ class BatchJob(object):
             # environment platform, so let's just default to EC2 for now.
             platform = "EC2"
         else:
-            response = self._client.describe_job_queues(jobQueues=[job_queue])
-            if len(response["jobQueues"]) == 0:
-                raise BatchJobException("AWS Batch Job Queue %s not found." % job_queue)
-            compute_environment = response["jobQueues"][0]["computeEnvironmentOrder"][
-                0
-            ]["computeEnvironment"]
-            response = self._client.describe_compute_environments(
-                computeEnvironments=[compute_environment]
-            )
-            platform = response["computeEnvironments"][0]["computeResources"]["type"]
+            # Cache platform detection per queue to avoid repeated API calls
+            if job_queue in self._platform_cache:
+                platform = self._platform_cache[job_queue]
+            else:
+                response = _describe_job_queues(self._client, jobQueues=[job_queue])
+                if len(response["jobQueues"]) == 0:
+                    raise BatchJobException("AWS Batch Job Queue %s not found." % job_queue)
+                compute_environment = response["jobQueues"][0]["computeEnvironmentOrder"][
+                    0
+                ]["computeEnvironment"]
+                response = _describe_compute_environments(
+                    self._client, computeEnvironments=[compute_environment]
+                )
+                platform = response["computeEnvironments"][0]["computeResources"]["type"]
+                self._platform_cache[job_queue] = platform
 
         # compose job definition
         job_definition = {
