@@ -717,10 +717,15 @@ class BatchJob(object):
 class RunningJob(object):
     NUM_RETRIES = 8
 
+    # Minimum seconds between describe_jobs API calls per job.
+    # Prevents overwhelming the AWS Batch API when many jobs poll concurrently.
+    _MIN_POLL_INTERVAL_SECS = 15
+
     def __init__(self, id, client):
         self._id = id
         self._client = client
         self._data = {}
+        self._last_poll_time = 0
 
     def __repr__(self):
         return "{}('{}')".format(self.__class__.__name__, self._id)
@@ -729,6 +734,14 @@ class RunningJob(object):
         self._data = data
 
     def _update(self):
+        import time as _time
+        import random as _random
+        now = _time.time()
+        # Add up to 5s jitter so concurrent jobs don't all poll at the same instant
+        jittered_interval = self._MIN_POLL_INTERVAL_SECS + _random.uniform(0, 5)
+        if self._data and (now - self._last_poll_time) < jittered_interval:
+            return  # Skip — polled too recently
+        self._last_poll_time = now
         data = describe_jobs(self._client, jobs=[self._id])
         # There have been sporadic reports of empty responses to the
         # batch.describe_jobs API call, which can potentially happen if the
