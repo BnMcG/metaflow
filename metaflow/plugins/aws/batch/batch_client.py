@@ -84,7 +84,6 @@ class BatchClient(object):
         from ..aws_client import get_aws_client
 
         self._client = get_aws_client("batch")
-        self._platform_cache = {}  # job_queue -> platform type
 
     def active_job_queues(self):
         paginator = self._client.get_paginator("describe_job_queues")
@@ -134,6 +133,8 @@ class BatchJobException(MetaflowException):
 
 
 class BatchJob(object):
+    _platform_cache = {}  # class-level cache: job_queue -> platform type
+
     def __init__(self, client):
         self._client = client
         tree = lambda: defaultdict(tree)
