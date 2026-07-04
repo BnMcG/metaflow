@@ -7,6 +7,10 @@ METAFLOW_EXIT_DISALLOW_RETRY = 202
 # worker processes that exit with this code should be retried (if retry counts left)
 METAFLOW_EXIT_ALLOW_RETRY = 203
 
+# worker processes preempted by spot/preemptible instance reclaim should be
+# retried without counting against the retry budget
+METAFLOW_EXIT_SPOT_PREEMPTED = 204
+
 
 class MetaflowExceptionWrapper(Exception):
     def __init__(self, exc=None):

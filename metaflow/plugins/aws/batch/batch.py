@@ -52,6 +52,10 @@ class BatchKilledException(MetaflowException):
     headline = "AWS Batch task killed"
 
 
+class SpotPreemptionException(MetaflowException):
+    headline = "AWS Batch task preempted by spot reclaim"
+
+
 class Batch(object):
     def __init__(self, metadata, environment, flow_datastore=None):
         self.metadata = metadata
@@ -562,6 +566,20 @@ class Batch(object):
                 ]
                 if msg is not None
             )
+            # Detect spot/preemptible instance reclaim
+            spot_preemption_phrases = [
+                "Your Spot Task was interrupted",
+                "Host EC2",
+                "terminated",
+                "spot instance interruption",
+            ]
+            reason_str = " ".join(
+                str(r) for r in [self.job.reason, self.job.status_reason] if r
+            ).lower()
+            if any(phrase.lower() in reason_str for phrase in spot_preemption_phrases):
+                raise SpotPreemptionException(
+                    "Task preempted by spot instance reclaim: %s" % msg
+                )
             raise BatchException(
                 "%s " "This could be a transient error. " "Use @retry to retry." % msg
             )

@@ -41,6 +41,7 @@ from .exception import (
     MetaflowException,
     MetaflowInternalError,
     METAFLOW_EXIT_DISALLOW_RETRY,
+    METAFLOW_EXIT_SPOT_PREEMPTED,
 )
 from . import procpoll
 from .datastore import FlowDataStore, TaskDataStoreSet
@@ -1433,7 +1434,18 @@ class NativeRuntime(object):
                         task = worker.task
                         if returncode:
                             # worker did not finish successfully
-                            if (
+                            if returncode == METAFLOW_EXIT_SPOT_PREEMPTED:
+                                # Spot preemption: retry without counting
+                                # against the retry budget
+                                self._logger(
+                                    "Task preempted by spot instance reclaim. "
+                                    "Retrying (does not count against retry budget).",
+                                    system_msg=True,
+                                )
+                                self._retry_worker(
+                                    worker, count_against_budget=False
+                                )
+                            elif (
                                 worker.cleaned
                                 or returncode == METAFLOW_EXIT_DISALLOW_RETRY
                             ):
@@ -1478,8 +1490,9 @@ class NativeRuntime(object):
             task = self._new_task(step, **task_kwargs)
             self._launch_worker(task)
 
-    def _retry_worker(self, worker):
-        worker.task.retries += 1
+    def _retry_worker(self, worker, count_against_budget=True):
+        if count_against_budget:
+            worker.task.retries += 1
         if worker.task.retries >= MAX_ATTEMPTS:
             # any results with an attempt ID >= MAX_ATTEMPTS will be ignored
             # by datastore, so running a task with such a retry_could would

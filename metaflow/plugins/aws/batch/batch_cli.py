@@ -6,12 +6,12 @@ import traceback
 
 from metaflow import util
 from metaflow import R
-from metaflow.exception import CommandException, METAFLOW_EXIT_DISALLOW_RETRY
+from metaflow.exception import CommandException, METAFLOW_EXIT_DISALLOW_RETRY, METAFLOW_EXIT_SPOT_PREEMPTED
 from metaflow.metadata_provider.util import sync_local_metadata_from_datastore
 from metaflow.metaflow_config import DATASTORE_LOCAL_DIR
 from metaflow.mflog import TASK_LOG_SOURCE
 from metaflow.unbounded_foreach import UBF_CONTROL, UBF_TASK
-from .batch import Batch, BatchKilledException
+from .batch import Batch, BatchKilledException, SpotPreemptionException
 from ..aws_utils import validate_aws_tag
 
 
@@ -385,5 +385,9 @@ def step(
         # don't retry killed tasks
         traceback.print_exc()
         sys.exit(METAFLOW_EXIT_DISALLOW_RETRY)
+    except SpotPreemptionException:
+        # retry without counting against the retry budget
+        traceback.print_exc()
+        sys.exit(METAFLOW_EXIT_SPOT_PREEMPTED)
     finally:
         _sync_metadata()
