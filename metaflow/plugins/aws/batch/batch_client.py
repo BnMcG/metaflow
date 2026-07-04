@@ -134,6 +134,7 @@ class BatchJobException(MetaflowException):
 
 class BatchJob(object):
     _platform_cache = {}  # class-level cache: job_queue -> platform type
+    _job_def_cache = {}  # class-level cache: def_name -> job definition ARN
 
     def __init__(self, client):
         self._client = client
@@ -508,15 +509,20 @@ class BatchJob(object):
 
             del job_definition["containerProperties"]  # not used for multi-node
 
-        # check if job definition already exists
+        # check if job definition already exists (cached to avoid API spam)
         def_name = (
             "metaflow_%s"
             % hashlib.sha224(str(job_definition).encode("utf-8")).hexdigest()
         )
+        if def_name in self._job_def_cache:
+            return self._job_def_cache[def_name]
+
         payload = {"jobDefinitionName": def_name, "status": "ACTIVE"}
         response = _describe_job_definitions(self._client, **payload)
         if len(response["jobDefinitions"]) > 0:
-            return response["jobDefinitions"][0]["jobDefinitionArn"]
+            arn = response["jobDefinitions"][0]["jobDefinitionArn"]
+            self._job_def_cache[def_name] = arn
+            return arn
 
         # else create a job definition
         job_definition["jobDefinitionName"] = def_name
@@ -533,7 +539,9 @@ class BatchJob(object):
                 )
             else:
                 raise ex
-        return response["jobDefinitionArn"]
+        arn = response["jobDefinitionArn"]
+        self._job_def_cache[def_name] = arn
+        return arn
 
     def job_def(
         self,
